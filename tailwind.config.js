@@ -14,6 +14,7 @@ module.exports = {
         "ink-muted": "var(--ink-muted)",
         "ink-faint": "var(--ink-faint)",
         accent: "var(--accent)",
+        "accent-hover": "var(--accent-hover)",
         "accent-soft": "var(--accent-soft)",
         line: "var(--line)",
         danger: "var(--danger)",

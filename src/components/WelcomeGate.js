@@ -57,7 +57,7 @@ export default function WelcomeGate() {
         </p>
         <button
           onClick={handleContinue}
-          className="mt-10 rounded-full border border-accent/40 bg-accent-soft px-8 py-3 text-sm font-medium text-ink transition-colors hover:border-accent hover:bg-accent/20"
+          className="mt-10 rounded-full bg-accent px-8 py-3 text-sm font-semibold text-bg transition-colors hover:bg-accent-hover"
         >
           Continue
         </button>

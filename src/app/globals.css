@@ -16,6 +16,7 @@
 
   /* A safelight amber-gold, the one accent, used sparingly. */
   --accent: #c99a3f;
+  --accent-hover: #dcae57;
   --accent-soft: #c99a3f26;
 
   --line: #33301f;

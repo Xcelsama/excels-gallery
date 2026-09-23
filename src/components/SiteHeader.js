@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 const links = [
   { href: "/gallery", label: "Gallery" },
@@ -7,6 +10,8 @@ const links = [
 ];
 
 export default function SiteHeader() {
+  const pathname = usePathname();
+
   return (
     <header className="border-b border-line">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5 sm:px-8">
@@ -16,16 +21,27 @@ export default function SiteHeader() {
         >
           Excel&rsquo;s Gallery
         </Link>
-        <nav className="flex items-center gap-6 text-sm text-ink-muted">
-          {links.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className="transition-colors hover:text-ink"
-            >
-              {link.label}
-            </Link>
-          ))}
+        <nav className="flex items-center gap-6 text-sm">
+          {links.map((link) => {
+            const isActive = pathname?.startsWith(link.href);
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={
+                  "relative py-1 transition-colors " +
+                  (isActive
+                    ? "text-ink"
+                    : "text-ink-muted hover:text-ink")
+                }
+              >
+                {link.label}
+                {isActive && (
+                  <span className="absolute -bottom-[1px] left-0 right-0 h-px bg-accent" />
+                )}
+              </Link>
+            );
+          })}
         </nav>
       </div>
     </header>

@@ -55,8 +55,8 @@ export default function GalleryGrid({ projects }) {
               className={
                 "rounded-full border px-3 py-1.5 transition-colors " +
                 (activeTag === null
-                  ? "border-accent/60 bg-accent-soft text-ink"
-                  : "border-line text-ink-muted hover:text-ink")
+                  ? "border-accent bg-accent text-bg font-medium"
+                  : "border-line text-ink-muted hover:border-ink-faint hover:text-ink")
               }
             >
               All
@@ -68,8 +68,8 @@ export default function GalleryGrid({ projects }) {
                 className={
                   "rounded-full border px-3 py-1.5 transition-colors " +
                   (tag === activeTag
-                    ? "border-accent/60 bg-accent-soft text-ink"
-                    : "border-line text-ink-muted hover:text-ink")
+                    ? "border-accent bg-accent text-bg font-medium"
+                    : "border-line text-ink-muted hover:border-ink-faint hover:text-ink")
                 }
               >
                 {tag}
