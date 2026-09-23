@@ -1,4 +1,4 @@
-# Excel's Gallery
+ # Excel's Gallery
 
 A before/after photo-editing gallery for Lightroom Mobile work — Next.js
 (App Router) + Supabase (Postgres, Auth, Storage) + Vercel. 
