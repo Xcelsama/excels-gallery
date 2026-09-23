@@ -1,0 +1,82 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Warm, dark "darkroom" ground — not a flat, cold near-black — so the
+     photographs stay the brightest, most saturated things on the page. */
+  --bg: #15130f;
+  --surface: #1c1911;
+  --surface-raised: #242016;
+
+  /* Off-white ink like matte photo paper, not paper-white #fff. */
+  --ink: #f2ede3;
+  --ink-muted: #a79c87;
+  --ink-faint: #6f6656;
+
+  /* A safelight amber-gold — the one accent, used sparingly. */
+  --accent: #c99a3f;
+  --accent-soft: #c99a3f26;
+
+  --line: #33301f;
+  --danger: #c2543f;
+}
+
+* {
+  border-color: var(--line);
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: env(safe-area-inset-top, 0px);
+}
+
+body {
+  background-color: var(--bg);
+  background-image: radial-gradient(
+    ellipse 80% 60% at 50% -10%,
+    rgba(201, 154, 63, 0.08),
+    transparent 60%
+  );
+  background-attachment: fixed;
+}
+
+::selection {
+  background: var(--accent-soft);
+  color: var(--ink);
+}
+
+/* Visible keyboard focus everywhere, styled to match the palette instead
+   of the browser default blue. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* A very faint grain over the whole page, mimicking photographic paper
+   rather than a flat digital gradient. Pure CSS, no image asset. */
+.grain {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.035;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+.text-balance {
+  text-wrap: balance;
+}
