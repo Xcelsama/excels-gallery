@@ -1,6 +1,6 @@
 import AdminLoginForm from "@/components/AdminLoginForm";
 
-export const metadata = { title: "Admin login — Excel's Gallery" };
+export const metadata = { title: "Admin login | Excel's Gallery" };
 
 export default function AdminLoginPage() {
   return (

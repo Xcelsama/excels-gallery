@@ -8,7 +8,7 @@ import { NextResponse } from "next/server";
  *     an actual signed-in user, before any page/layout even renders.
  *
  * This is defense-in-depth on top of, not instead of, the RLS policies in
- * supabase/migrations/0001_init.sql — even if a request slipped past this
+ * supabase/migrations/0001_init.sql, even if a request slipped past this
  * middleware, Postgres would still refuse an unauthenticated write.
  */
 export async function middleware(request) {

@@ -26,7 +26,7 @@ const nextConfig = {
           },
         ]
       : [],
-    // Lightroom edits are the whole point of this site — don't let the
+    // Lightroom edits are the whole point of this site, don't let the
     // default quality squash them. Grid thumbnails still get resized/lazy
     // loaded for speed; only the compression amount is raised.
     qualities: [75, 90, 95],

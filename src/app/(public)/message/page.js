@@ -1,6 +1,6 @@
 import MessageForm from "@/components/MessageForm";
 
-export const metadata = { title: "Message Excel — Excel's Gallery" };
+export const metadata = { title: "Message Excel | Excel's Gallery" };
 
 export default function MessagePage() {
   return (
@@ -9,7 +9,7 @@ export default function MessagePage() {
         Message Excel
       </h1>
       <p className="mt-3 text-ink-muted">
-        Questions, feedback, or a project you&rsquo;d like edited — send a
+        Questions, feedback, or a project you&rsquo;d like edited? Send a
         note below.
       </p>
       <div className="mt-10">

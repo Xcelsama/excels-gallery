@@ -7,7 +7,7 @@ import { createServerClient } from "@supabase/ssr";
  * route handlers. Reads/writes the session via the request's cookies, so
  * `supabase.auth.getUser()` reflects whoever is actually signed in.
  *
- * Still uses only the public URL + anon key — the admin's permissions come
+ * Still uses only the public URL + anon key, the admin's permissions come
  * from their authenticated session plus the RLS policies in
  * supabase/migrations/0001_init.sql, not from an elevated key.
  */
@@ -30,7 +30,7 @@ export async function createClient() {
           } catch {
             // Called from a Server Component render, where cookies can't be
             // written. Harmless as long as middleware.js is also refreshing
-            // the session on every request (it is) — see middleware.js.
+            // the session on every request (it is), see middleware.js.
           }
         },
       },

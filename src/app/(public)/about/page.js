@@ -1,6 +1,6 @@
 import about from "@/content/about";
 
-export const metadata = { title: "About — Excel's Gallery" };
+export const metadata = { title: "About | Excel's Gallery" };
 
 export default function AboutPage() {
   return (

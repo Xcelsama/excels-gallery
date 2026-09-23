@@ -9,7 +9,7 @@ export default async function AdminAnalytics() {
   if (!isAnalyticsConfigured()) {
     return (
       <p className="text-sm text-ink-faint">
-        Not connected — add VERCEL_TOKEN and VERCEL_PROJECT_ID to your
+        Not connected. Add VERCEL_TOKEN and VERCEL_PROJECT_ID to your
         environment variables to see visitor stats here. The rest of the
         site works fine without it.
       </p>
@@ -87,7 +87,7 @@ export default async function AdminAnalytics() {
 function Stat({ label, value }) {
   return (
     <div>
-      <p className="font-display text-2xl text-ink">{value ?? "—"}</p>
+      <p className="font-display text-2xl text-ink">{value ?? "N/A"}</p>
       <p className="text-xs text-ink-faint">{label}</p>
     </div>
   );

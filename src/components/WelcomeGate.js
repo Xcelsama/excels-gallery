@@ -33,7 +33,7 @@ export default function WelcomeGate() {
       window.localStorage.setItem(STORAGE_KEY, "1");
     } catch {
       // If storage isn't available, the visitor will just see the welcome
-      // screen again next time — not ideal, but not a broken experience.
+      // screen again next time, not ideal, but not a broken experience.
     }
     router.push("/gallery");
   }
@@ -52,7 +52,7 @@ export default function WelcomeGate() {
           Excel&rsquo;s Gallery
         </h1>
         <p className="mt-4 max-w-sm text-balance text-ink-muted">
-          Before-and-after Lightroom edits — light, color, and composition,
+          Before-and-after Lightroom edits: light, color, and composition,
           worked through one photograph at a time.
         </p>
         <button
@@ -65,7 +65,7 @@ export default function WelcomeGate() {
 
       {/* Discreet admin entry point: a small, low-visibility corner mark
           rather than a labeled nav item. Still a real, focusable link for
-          keyboard and screen-reader use — just not visually advertised. */}
+          keyboard and screen-reader use, just not visually advertised. */}
       <Link
         href="/admin/login"
         aria-label="Admin"

@@ -5,7 +5,7 @@ import AdminMessages from "@/components/AdminMessages";
 import AdminAnalytics from "@/components/AdminAnalytics";
 import { createClient } from "@/lib/supabase/server";
 
-export const metadata = { title: "Studio — Excel's Gallery" };
+export const metadata = { title: "Studio | Excel's Gallery" };
 
 export default async function AdminDashboardPage() {
   const supabase = await createClient();

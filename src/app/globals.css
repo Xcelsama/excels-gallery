@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 :root {
-  /* Warm, dark "darkroom" ground — not a flat, cold near-black — so the
+  /* Warm, dark "darkroom" ground, not a flat, cold near-black, so the
      photographs stay the brightest, most saturated things on the page. */
   --bg: #15130f;
   --surface: #1c1911;
@@ -14,7 +14,7 @@
   --ink-muted: #a79c87;
   --ink-faint: #6f6656;
 
-  /* A safelight amber-gold — the one accent, used sparingly. */
+  /* A safelight amber-gold, the one accent, used sparingly. */
   --accent: #c99a3f;
   --accent-soft: #c99a3f26;
 

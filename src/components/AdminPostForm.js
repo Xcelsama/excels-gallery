@@ -1,13 +1,17 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState } from "react";
-import { useFormStatus } from "react-dom";
+import { useEffect, useRef, useState } from "react";
 import { createPost, updatePost } from "@/app/admin/actions";
+import { createClient } from "@/lib/supabase/client";
 
-const initialState = { success: false, error: null };
+const BUCKET = "gallery";
 
-function SubmitButton({ label, pendingLabel }) {
-  const { pending } = useFormStatus();
+// Supabase's Free plan caps a single file at 50 MB. Staying well under that
+// gives a friendly message here instead of a raw storage error.
+const MAX_FILE_MB = 25;
+const MAX_FILE_BYTES = MAX_FILE_MB * 1024 * 1024;
+
+function SubmitButton({ pending, label, pendingLabel }) {
   return (
     <button
       type="submit"
@@ -21,6 +25,7 @@ function SubmitButton({ label, pendingLabel }) {
 
 function ImagePicker({ name, label, initialUrl, required }) {
   const [previewUrl, setPreviewUrl] = useState(initialUrl ?? null);
+  const [fileInfo, setFileInfo] = useState(null);
   const objectUrlRef = useRef(null);
 
   useEffect(() => {
@@ -36,6 +41,7 @@ function ImagePicker({ name, label, initialUrl, required }) {
     const url = URL.createObjectURL(file);
     objectUrlRef.current = url;
     setPreviewUrl(url);
+    setFileInfo(`${(file.size / 1024 / 1024).toFixed(1)} MB`);
   }
 
   return (
@@ -56,6 +62,9 @@ function ImagePicker({ name, label, initialUrl, required }) {
           <span className="text-xs text-ink-faint">Click to choose a file</span>
         )}
       </div>
+      {fileInfo && (
+        <span className="mt-1 block text-xs text-ink-faint">{fileInfo}</span>
+      )}
       <input
         type="file"
         name={name}
@@ -67,32 +76,154 @@ function ImagePicker({ name, label, initialUrl, required }) {
   );
 }
 
+function isRealFile(value) {
+  return value instanceof File && value.size > 0;
+}
+
+function extFromFile(file) {
+  const fromName = file.name?.split(".").pop()?.toLowerCase() ?? "";
+  const fromType = file.type?.split("/").pop()?.toLowerCase() ?? "";
+  const ext = (fromName.length <= 5 ? fromName : fromType).replace(
+    /[^a-z0-9]/g,
+    ""
+  );
+  return ext || "jpg";
+}
+
+function checkImage(file, label) {
+  if (!file.type.startsWith("image/")) {
+    return `The ${label} file needs to be an image.`;
+  }
+  if (file.size > MAX_FILE_BYTES) {
+    const mb = (file.size / 1024 / 1024).toFixed(1);
+    return `The ${label} image is ${mb} MB. The limit is ${MAX_FILE_MB} MB.`;
+  }
+  return null;
+}
+
+// Straight from the browser to Supabase Storage. The file never passes
+// through a Vercel function, so Vercel's 4.5 MB request limit doesn't apply.
+// Each upload gets a unique name so a replaced image is never served stale
+// from a cache.
+async function uploadToStorage(supabase, projectId, slot, file) {
+  const path = `${projectId}/${slot}-${Date.now()}.${extFromFile(file)}`;
+  const { error } = await supabase.storage.from(BUCKET).upload(path, file, {
+    contentType: file.type,
+    cacheControl: "31536000",
+  });
+  if (error) {
+    throw new Error(`Could not upload the ${slot} image (${error.message}).`);
+  }
+  return path;
+}
+
+async function removeFromStorage(supabase, paths) {
+  if (!paths.length) return;
+  try {
+    await supabase.storage.from(BUCKET).remove(paths);
+  } catch {
+    // Best effort only. A leftover file is harmless.
+  }
+}
+
 export default function AdminPostForm({ mode = "create", project = null, onDone }) {
-  const action = mode === "edit" ? updatePost : createPost;
-  const [state, formAction] = useActionState(action, initialState);
+  const isEdit = mode === "edit";
+  const [stage, setStage] = useState(null); // null | "uploading" | "saving"
+  const [error, setError] = useState(null);
+  const [notice, setNotice] = useState(null);
   const [showPreview, setShowPreview] = useState(false);
   const [tags, setTags] = useState(project?.tags?.join(", ") ?? "");
   const [title, setTitle] = useState(project?.title ?? "");
+  const [pickerKey, setPickerKey] = useState(0);
   const formRef = useRef(null);
+  const pending = stage !== null;
 
-  useEffect(() => {
-    if (state.success) {
-      if (mode === "create") {
+  async function handleSubmit(e) {
+    e.preventDefault();
+    if (pending) return;
+
+    // Read everything from the form before the first await.
+    const formData = new FormData(e.currentTarget);
+    const cleanTitle = String(formData.get("title") ?? "").trim();
+    const beforeFile = formData.get("beforeImage");
+    const afterFile = formData.get("afterImage");
+    const hasBefore = isRealFile(beforeFile);
+    const hasAfter = isRealFile(afterFile);
+
+    setError(null);
+    setNotice(null);
+
+    // Validate everything up front so we never upload files for a post
+    // that was going to be rejected anyway.
+    if (!cleanTitle) return setError("Title is required.");
+    if (!isEdit && !hasBefore) return setError("A before image is required.");
+    if (!isEdit && !hasAfter) return setError("An after image is required.");
+    const problem =
+      (hasBefore && checkImage(beforeFile, "before")) ||
+      (hasAfter && checkImage(afterFile, "after"));
+    if (problem) return setError(problem);
+
+    const id = isEdit ? String(formData.get("id") ?? "") : crypto.randomUUID();
+    if (!id) return setError("Missing project id.");
+
+    // The server only ever receives small text fields plus the storage
+    // paths of the files we uploaded. Never the files themselves.
+    const payload = new FormData();
+    for (const [key, value] of formData.entries()) {
+      if (!(value instanceof File)) payload.append(key, value);
+    }
+    payload.set("id", id);
+
+    const supabase = createClient();
+    const uploadedPaths = [];
+
+    try {
+      setStage("uploading");
+      const jobs = [];
+      if (hasBefore) jobs.push(["beforePath", "before", beforeFile]);
+      if (hasAfter) jobs.push(["afterPath", "after", afterFile]);
+
+      const results = await Promise.allSettled(
+        jobs.map(([, slot, file]) => uploadToStorage(supabase, id, slot, file))
+      );
+
+      let firstFailure = null;
+      results.forEach((result, i) => {
+        if (result.status === "fulfilled") {
+          uploadedPaths.push(result.value);
+          payload.set(jobs[i][0], result.value);
+        } else if (!firstFailure) {
+          firstFailure = result.reason;
+        }
+      });
+      if (firstFailure) throw firstFailure;
+
+      setStage("saving");
+      const result = await (isEdit ? updatePost(payload) : createPost(payload));
+      if (!result.success) throw new Error(result.error);
+
+      if (isEdit) {
+        onDone?.();
+      } else {
         formRef.current?.reset();
         setTitle("");
         setTags("");
         setShowPreview(false);
-      } else {
-        onDone?.();
+        setPickerKey((k) => k + 1);
+        setNotice("Published. It is live in the gallery now.");
       }
+    } catch (err) {
+      // Don't leave orphaned uploads behind when the post didn't save.
+      await removeFromStorage(supabase, uploadedPaths);
+      setError(err.message || "Something went wrong. Please try again.");
+    } finally {
+      setStage(null);
     }
-  }, [state.success, mode, onDone]);
+  }
 
   return (
-    <form ref={formRef} action={formAction} className="space-y-6">
-      {mode === "edit" && (
-        <input type="hidden" name="id" value={project.id} />
-      )}
+    <form ref={formRef} onSubmit={handleSubmit} className="space-y-6">
+      {isEdit && <input type="hidden" name="id" value={project.id} />}
 
       <div>
         <label htmlFor="title" className="block text-sm text-ink-muted">
@@ -150,30 +281,39 @@ export default function AdminPostForm({ mode = "create", project = null, onDone 
 
       <div className="grid grid-cols-2 gap-4">
         <ImagePicker
+          key={`before-${pickerKey}`}
           name="beforeImage"
           label="Before image"
           initialUrl={project?.before_image_url}
-          required={mode === "create"}
+          required={!isEdit}
         />
         <ImagePicker
+          key={`after-${pickerKey}`}
           name="afterImage"
           label="After image"
           initialUrl={project?.after_image_url}
-          required={mode === "create"}
+          required={!isEdit}
         />
       </div>
-      {mode === "edit" && (
-        <p className="-mt-3 text-xs text-ink-faint">
-          Leave an image untouched to keep the current file.
-        </p>
-      )}
+      <p className="-mt-3 text-xs text-ink-faint">
+        Up to {MAX_FILE_MB} MB per image.
+        {isEdit && " Leave an image untouched to keep the current file."}
+      </p>
 
-      {state.error && <p className="text-sm text-danger">{state.error}</p>}
+      {error && <p className="text-sm text-danger">{error}</p>}
+      {notice && <p className="text-sm text-ink-muted">{notice}</p>}
 
       <div className="flex items-center gap-3">
         <SubmitButton
-          label={mode === "edit" ? "Save changes" : "Publish"}
-          pendingLabel={mode === "edit" ? "Saving…" : "Publishing…"}
+          pending={pending}
+          label={isEdit ? "Save changes" : "Publish"}
+          pendingLabel={
+            stage === "uploading"
+              ? "Uploading images…"
+              : isEdit
+                ? "Saving…"
+                : "Publishing…"
+          }
         />
         <button
           type="button"
@@ -182,7 +322,7 @@ export default function AdminPostForm({ mode = "create", project = null, onDone 
         >
           {showPreview ? "Hide preview" : "Preview"}
         </button>
-        {mode === "edit" && (
+        {isEdit && (
           <button
             type="button"
             onClick={onDone}
@@ -215,8 +355,8 @@ export default function AdminPostForm({ mode = "create", project = null, onDone 
             </div>
           )}
           <p className="mt-3 text-xs text-ink-faint">
-            This is a rough preview from your local files — the published
-            page lays the before/after pair out full width.
+            This is a rough preview from your local files. The published page
+            lays the before/after pair out full width.
           </p>
         </div>
       )}

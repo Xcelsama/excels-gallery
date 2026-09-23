@@ -1,5 +1,5 @@
 /**
- * "Published September 23, 2026 · 12:48 AM" — from a Postgres timestamptz
+ * "Published September 23, 2026 · 12:48 AM", from a Postgres timestamptz
  * string. Formatted on the server (and re-usable on the client) so it never
  * depends on the visitor's own device clock/locale for correctness, only
  * for which timezone it displays in.

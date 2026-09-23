@@ -17,7 +17,7 @@ export default function CompareSlider({ before, after, title }) {
         <figure className="bg-surface">
           <img
             src={before}
-            alt={`${title} — before`}
+            alt={`${title}, before`}
             className="block h-auto w-full"
           />
           <figcaption className="px-1 py-3 text-sm text-ink-muted">
@@ -27,7 +27,7 @@ export default function CompareSlider({ before, after, title }) {
         <figure className="bg-surface">
           <img
             src={after}
-            alt={`${title} — after`}
+            alt={`${title}, after`}
             className="block h-auto w-full"
           />
           <figcaption className="px-1 py-3 text-sm text-ink-muted">
@@ -89,7 +89,7 @@ function DragSlider({ before, after, title }) {
     >
       <img
         src={after}
-        alt={`${title} — after`}
+        alt={`${title}, after`}
         draggable={false}
         className="block h-auto w-full"
       />
@@ -99,7 +99,7 @@ function DragSlider({ before, after, title }) {
       >
         <img
           src={before}
-          alt={`${title} — before`}
+          alt={`${title}, before`}
           draggable={false}
           className="absolute inset-0 h-full w-full object-cover"
         />

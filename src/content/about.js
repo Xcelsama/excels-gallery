@@ -1,5 +1,5 @@
 /**
- * Content for the /about page. Edit this file directly and redeploy —
+ * Content for the /about page. Edit this file directly and redeploy,
  * intentionally not stored in Supabase or editable from /admin, so it never
  * needs a UI just to fix a typo.
  */

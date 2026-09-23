@@ -2,10 +2,10 @@ import GalleryGrid from "@/components/GalleryGrid";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata = {
-  title: "Gallery — Excel's Gallery",
+  title: "Gallery | Excel's Gallery",
 };
 
-// Data changes only when the admin publishes, not on every request — a
+// Data changes only when the admin publishes, not on every request, a
 // short revalidation window keeps the gallery fast without going fully
 // static and missing new posts for too long.
 export const revalidate = 60;

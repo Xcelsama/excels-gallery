@@ -20,7 +20,7 @@ const sans = Work_Sans({
 export const metadata = {
   title: "Excel's Gallery",
   description:
-    "Before-and-after Lightroom Mobile edits by Excel Amadi — a study in light, color, and composition.",
+    "Before-and-after Lightroom Mobile edits by Excel Amadi: a study in light, color, and composition.",
 };
 
 export default function RootLayout({ children }) {

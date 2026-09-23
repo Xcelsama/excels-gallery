@@ -4,14 +4,14 @@ import "server-only";
  * Thin wrapper around Vercel's Web Analytics API
  * (https://vercel.com/docs/analytics/web-analytics-api).
  *
- * This is read-only, server-side only, and entirely separate from Supabase —
+ * This is read-only, server-side only, and entirely separate from Supabase:
  * per the brief, Vercel Web Analytics is the source of truth for visitor
  * data, so this app never keeps its own visitor-count table.
  *
  * Requires VERCEL_TOKEN + VERCEL_PROJECT_ID (and VERCEL_TEAM_ID if the
  * project lives under a team). If they're missing, every function below
  * resolves to `null` instead of throwing, so the rest of the admin
- * dashboard still works — see isAnalyticsConfigured().
+ * dashboard still works, see isAnalyticsConfigured().
  */
 
 const API_BASE = "https://api.vercel.com/v1/query/web-analytics";

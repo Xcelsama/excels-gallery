@@ -6,7 +6,7 @@ export default function SiteFooter() {
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-8 text-xs text-ink-faint sm:px-8">
         <p>© {new Date().getFullYear()} Excel&rsquo;s Gallery</p>
 
-        {/* Same discreet pattern as the welcome screen — but here it's on
+        {/* Same discreet pattern as the welcome screen, but here it's on
             every public page, every visit, not just a one-time screen. */}
         <Link
           href="/admin/login"

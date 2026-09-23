@@ -1,9 +1,9 @@
--- Excel's Gallery — initial schema
+-- Excel's Gallery: initial schema
 -- Run this once in the Supabase SQL Editor (Dashboard → SQL Editor → New query),
 -- or via `supabase db push` if you use the Supabase CLI.
 
 -- ============================================================================
--- 1. gallery_projects — one row per before/after editing project
+-- 1. gallery_projects: one row per before/after editing project
 -- ============================================================================
 
 create table if not exists public.gallery_projects (
@@ -49,7 +49,7 @@ create index if not exists gallery_projects_tags_idx
 alter table public.gallery_projects enable row level security;
 
 -- Public visitors may only ever read. Note there is no anon INSERT/UPDATE/
--- DELETE policy at all below — with RLS enabled, the *absence* of a policy
+-- DELETE policy at all below, with RLS enabled, the *absence* of a policy
 -- is itself the denial, so this is enforced at the database layer, not just
 -- hidden in the UI.
 create policy "gallery_projects_public_read"
@@ -58,7 +58,7 @@ create policy "gallery_projects_public_read"
   to anon, authenticated
   using (true);
 
--- Only a signed-in Supabase Auth user (i.e. you, the admin — there is no
+-- Only a signed-in Supabase Auth user (i.e. you, the admin, there is no
 -- public sign-up flow in this app) can write. Because the only account
 -- created is yours, "authenticated" and "admin" mean the same thing here.
 create policy "gallery_projects_admin_insert"
@@ -81,7 +81,7 @@ create policy "gallery_projects_admin_delete"
   using (true);
 
 -- ============================================================================
--- 2. messages — "Message Excel" contact form submissions
+-- 2. messages: "Message Excel" contact form submissions
 -- ============================================================================
 
 create table if not exists public.messages (
@@ -126,7 +126,7 @@ create policy "messages_admin_delete"
   using (true);
 
 -- ============================================================================
--- 3. Storage — a public "gallery" bucket for before/after images
+-- 3. Storage: a public "gallery" bucket for before/after images
 -- ============================================================================
 
 insert into storage.buckets (id, name, public)
@@ -165,7 +165,7 @@ create policy "gallery_bucket_admin_delete"
 -- ============================================================================
 -- * No service-role key is required anywhere in this app. Every write goes
 --   through a signed-in user's own session, so it's checked against the
---   policies above by Postgres itself — not just trusted from the client.
+--   policies above by Postgres itself, not just trusted from the client.
 -- * To create your one admin account: Supabase Dashboard → Authentication →
 --   Users → Add user. There is no public sign-up route in this app, so that
 --   dashboard screen (or the Admin API) is the only way an account gets made.

@@ -15,7 +15,7 @@ export async function generateMetadata({ params }) {
 
   if (!project) return { title: "Excel's Gallery" };
   return {
-    title: `${project.title} — Excel's Gallery`,
+    title: `${project.title} | Excel's Gallery`,
     description: project.caption ?? undefined,
   };
 }

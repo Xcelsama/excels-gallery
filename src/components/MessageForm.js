@@ -26,7 +26,7 @@ export default function MessageForm() {
   if (state.success) {
     return (
       <p className="rounded-lg border border-line bg-surface px-5 py-4 text-sm text-ink">
-        Thanks — your message is on its way.
+        Thanks, your message is on its way.
       </p>
     );
   }
