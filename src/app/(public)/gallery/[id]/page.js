@@ -37,9 +37,23 @@ export default async function ProjectPage({ params }) {
     <main className="mx-auto max-w-5xl px-6 py-12 sm:px-8">
       <Link
         href="/gallery"
-        className="text-sm text-ink-muted transition-colors hover:text-ink"
+        className="group inline-flex items-center gap-2 rounded-full border border-line py-1.5 pl-2.5 pr-4 text-sm text-ink-muted transition-colors hover:border-ink-faint hover:text-ink"
       >
-        ← Gallery
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="transition-transform duration-200 group-hover:-translate-x-0.5"
+        >
+          <path d="M19 12H5" />
+          <path d="M12 19l-7-7 7-7" />
+        </svg>
+        Gallery
       </Link>
 
       <h1 className="mt-4 font-display text-3xl text-ink sm:text-4xl">
