@@ -14,6 +14,9 @@ export default function ProjectCard({ project, priority = false }) {
           quality={80}
           priority={priority}
           className="object-cover transition-transform duration-700 ease-out group-hover:scale-[1.03]"
+          {...(project.after_blur_data_url
+            ? { placeholder: "blur", blurDataURL: project.after_blur_data_url }
+            : {})}
         />
         {/* Subtle top-down scrim so the badge sits on the image, not
             behind a generic blurred pill — reads as part of the photo. */}

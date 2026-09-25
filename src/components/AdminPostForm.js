@@ -101,6 +101,49 @@ function checkImage(file, label) {
   return null;
 }
 
+function loadImageElement(objectUrl) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    // naturalWidth/naturalHeight (and drawing this element to a canvas,
+    // below) both reflect the orientation the browser actually displays,
+    // EXIF rotation included, unlike some lower-level decode APIs. That
+    // matters here: getting this wrong would silently swap width/height
+    // for portrait photos and reintroduce the exact layout-shift bug this
+    // is meant to fix.
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error("Could not read the image file."));
+    img.src = objectUrl;
+  });
+}
+
+// Reads a photo's intrinsic pixel size plus a tiny (~16px-wide) blurred
+// JPEG preview, entirely client-side, no upload or network round trip.
+// Both get stored alongside the project so the public site can render
+// with next/image: a reserved aspect ratio (no layout shift while a large
+// photo loads) and a blur-up placeholder instead of a blank box.
+async function readImageMeta(file) {
+  const objectUrl = URL.createObjectURL(file);
+  try {
+    const img = await loadImageElement(objectUrl);
+    const width = img.naturalWidth;
+    const height = img.naturalHeight;
+    if (!width || !height) return null;
+
+    const targetWidth = 16;
+    const targetHeight = Math.max(1, Math.round((height / width) * targetWidth));
+    const canvas = document.createElement("canvas");
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+    const blurDataUrl = canvas.toDataURL("image/jpeg", 0.5);
+
+    return { width, height, blurDataUrl };
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
 // Straight from the browser to Supabase Storage. The file never passes
 // through a Vercel function, so Vercel's 4.5 MB request limit doesn't apply.
 // Each upload gets a unique name so a replaced image is never served stale
@@ -166,6 +209,15 @@ export default function AdminPostForm({ mode = "create", project = null, onDone 
     const id = isEdit ? String(formData.get("id") ?? "") : crypto.randomUUID();
     if (!id) return setError("Missing project id.");
 
+    // Best-effort: read each new file's dimensions + blur placeholder
+    // before uploading. If a particular file can't be read this way for
+    // any reason, meta stays null and that image just falls back to the
+    // original unoptimized rendering rather than blocking the publish.
+    const [beforeMeta, afterMeta] = await Promise.all([
+      hasBefore ? readImageMeta(beforeFile).catch(() => null) : null,
+      hasAfter ? readImageMeta(afterFile).catch(() => null) : null,
+    ]);
+
     // The server only ever receives small text fields plus the storage
     // paths of the files we uploaded. Never the files themselves.
     const payload = new FormData();
@@ -173,6 +225,16 @@ export default function AdminPostForm({ mode = "create", project = null, onDone 
       if (!(value instanceof File)) payload.append(key, value);
     }
     payload.set("id", id);
+    if (beforeMeta) {
+      payload.set("beforeWidth", String(beforeMeta.width));
+      payload.set("beforeHeight", String(beforeMeta.height));
+      payload.set("beforeBlur", beforeMeta.blurDataUrl);
+    }
+    if (afterMeta) {
+      payload.set("afterWidth", String(afterMeta.width));
+      payload.set("afterHeight", String(afterMeta.height));
+      payload.set("afterBlur", afterMeta.blurDataUrl);
+    }
 
     const supabase = createClient();
     const uploadedPaths = [];

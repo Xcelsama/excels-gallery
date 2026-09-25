@@ -30,6 +30,12 @@ const nextConfig = {
     // default quality squash them. Grid thumbnails still get resized/lazy
     // loaded for speed; only the compression amount is raised.
     qualities: [75, 90, 95],
+    // AVIF first (smallest for photographic images at a given quality),
+    // falling back to WebP, then the source format for browsers that
+    // support neither. This is the main lever on "images are large": a
+    // multi-MB source photo typically comes back well under a few hundred
+    // KB once resized + re-encoded here.
+    formats: ["image/avif", "image/webp"],
   },
 };
 

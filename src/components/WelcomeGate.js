@@ -25,6 +25,10 @@ export default function WelcomeGate() {
       router.replace("/gallery");
     } else {
       setHasVisited(false);
+      // Warm up the gallery route while the visitor is reading the welcome
+      // screen, so the "Continue" click feels instant rather than starting
+      // the fetch only once they've already clicked.
+      router.prefetch("/gallery");
     }
   }, [router]);
 

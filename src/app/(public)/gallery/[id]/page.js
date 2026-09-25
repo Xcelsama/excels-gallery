@@ -9,14 +9,34 @@ export async function generateMetadata({ params }) {
   const supabase = await createClient();
   const { data: project } = await supabase
     .from("gallery_projects")
-    .select("title, caption")
+    .select("title, caption, after_image_url")
     .eq("id", id)
     .single();
 
-  if (!project) return { title: "Excel's Gallery" };
+  if (!project) return {};
+
+  // The root layout's title template appends " | Excel's Gallery"
+  // automatically, so `title` below stays just the project name. OG/Twitter
+  // tags aren't templated the same way, so they spell out the full string.
+  const fullTitle = `${project.title} | Excel's Gallery`;
+  const description = project.caption ?? undefined;
+
   return {
-    title: `${project.title} | Excel's Gallery`,
-    description: project.caption ?? undefined,
+    title: project.title,
+    description,
+    // The "after" shot is the finished result, so it's the one worth
+    // showing when this link is shared or unfurled elsewhere.
+    openGraph: {
+      title: fullTitle,
+      description,
+      images: project.after_image_url ? [{ url: project.after_image_url }] : [],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: fullTitle,
+      description,
+      images: project.after_image_url ? [project.after_image_url] : [],
+    },
   };
 }
 
@@ -68,6 +88,12 @@ export default async function ProjectPage({ params }) {
           before={project.before_image_url}
           after={project.after_image_url}
           title={project.title}
+          beforeWidth={project.before_width}
+          beforeHeight={project.before_height}
+          beforeBlur={project.before_blur_data_url}
+          afterWidth={project.after_width}
+          afterHeight={project.after_height}
+          afterBlur={project.after_blur_data_url}
         />
       </div>
 

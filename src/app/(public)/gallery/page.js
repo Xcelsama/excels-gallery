@@ -2,7 +2,7 @@ import GalleryGrid from "@/components/GalleryGrid";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata = {
-  title: "Gallery | Excel's Gallery",
+  title: "Gallery",
 };
 
 // Data changes only when the admin publishes, not on every request, a
@@ -15,7 +15,7 @@ export default async function GalleryPage() {
   const { data: projects, error } = await supabase
     .from("gallery_projects")
     .select(
-      "id, title, caption, tags, after_image_url, published_at"
+      "id, title, caption, tags, after_image_url, after_width, after_height, after_blur_data_url, published_at"
     )
     .order("published_at", { ascending: false });
 

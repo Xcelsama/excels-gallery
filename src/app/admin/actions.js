@@ -59,6 +59,40 @@ function readPostFields(formData) {
   return { title, caption, note, tags };
 }
 
+// Width/height/blur placeholder for one image slot ("before" or "after"),
+// as read client-side in AdminPostForm's readImageMeta and submitted
+// alongside the upload. Never trusted blindly: width and height are
+// bounds-checked integers (and only kept as a pair, mismatched aspect
+// ratio metadata is worse than none), and the blur string is capped at
+// the same length the 0002 migration's check constraint allows, so a
+// malformed value fails here with a normal empty result instead of a
+// raw database error.
+function readImageMetaFields(formData, slot) {
+  const width = Number(formData.get(`${slot}Width`));
+  const height = Number(formData.get(`${slot}Height`));
+  const blur = formData.get(`${slot}Blur`);
+
+  const result = {};
+  if (Number.isInteger(width) && width >= 1 && width <= 20000) {
+    result.width = width;
+  }
+  if (Number.isInteger(height) && height >= 1 && height <= 20000) {
+    result.height = height;
+  }
+  if (!("width" in result) || !("height" in result)) {
+    delete result.width;
+    delete result.height;
+  }
+  if (
+    typeof blur === "string" &&
+    blur.startsWith("data:image/") &&
+    blur.length <= 4000
+  ) {
+    result.blur = blur;
+  }
+  return result;
+}
+
 export async function createPost(formData) {
   const supabase = await createClient();
   const user = await requireUser(supabase);
@@ -75,6 +109,9 @@ export async function createPost(formData) {
   if (!beforePath) return { success: false, error: "A before image is required." };
   if (!afterPath) return { success: false, error: "An after image is required." };
 
+  const beforeMeta = readImageMetaFields(formData, "before");
+  const afterMeta = readImageMetaFields(formData, "after");
+
   try {
     const { error } = await supabase.from("gallery_projects").insert({
       id,
@@ -84,6 +121,12 @@ export async function createPost(formData) {
       tags,
       before_image_url: publicUrlFor(supabase, beforePath),
       after_image_url: publicUrlFor(supabase, afterPath),
+      before_width: beforeMeta.width ?? null,
+      before_height: beforeMeta.height ?? null,
+      before_blur_data_url: beforeMeta.blur ?? null,
+      after_width: afterMeta.width ?? null,
+      after_height: afterMeta.height ?? null,
+      after_blur_data_url: afterMeta.blur ?? null,
     });
     if (error) throw error;
   } catch (err) {
@@ -118,8 +161,25 @@ export async function updatePost(formData) {
   }
 
   const updates = { title, caption: caption || null, note: note || null, tags };
-  if (beforePath) updates.before_image_url = publicUrlFor(supabase, beforePath);
-  if (afterPath) updates.after_image_url = publicUrlFor(supabase, afterPath);
+  // Metadata travels with its image: only touched when that image slot
+  // was actually replaced, and explicitly nulled out (not left as-is) if
+  // this particular upload didn't come with usable metadata, so a new
+  // photo can never end up paired with a previous photo's stored
+  // dimensions or blur placeholder.
+  if (beforePath) {
+    updates.before_image_url = publicUrlFor(supabase, beforePath);
+    const beforeMeta = readImageMetaFields(formData, "before");
+    updates.before_width = beforeMeta.width ?? null;
+    updates.before_height = beforeMeta.height ?? null;
+    updates.before_blur_data_url = beforeMeta.blur ?? null;
+  }
+  if (afterPath) {
+    updates.after_image_url = publicUrlFor(supabase, afterPath);
+    const afterMeta = readImageMetaFields(formData, "after");
+    updates.after_width = afterMeta.width ?? null;
+    updates.after_height = afterMeta.height ?? null;
+    updates.after_blur_data_url = afterMeta.blur ?? null;
+  }
 
   // Remember the files being replaced so we can clean them up afterwards.
   let previous = null;

@@ -14,14 +14,14 @@ export default function SiteHeader() {
 
   return (
     <header className="border-b border-line">
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5 sm:px-8">
+      <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3.5 sm:px-8 sm:py-5">
         <Link
           href="/gallery"
-          className="font-display text-lg tracking-tight text-ink"
+          className="font-display text-base tracking-tight text-ink sm:text-lg"
         >
           Excel&rsquo;s Gallery
         </Link>
-        <nav className="flex items-center gap-6 text-sm">
+        <nav className="flex items-center gap-3.5 text-xs sm:gap-6 sm:text-sm">
           {links.map((link) => {
             const isActive = pathname?.startsWith(link.href);
             return (

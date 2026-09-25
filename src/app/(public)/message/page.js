@@ -1,6 +1,6 @@
 import MessageForm from "@/components/MessageForm";
 
-export const metadata = { title: "Message Excel | Excel's Gallery" };
+export const metadata = { title: "Message Excel" };
 
 export default function MessagePage() {
   return (

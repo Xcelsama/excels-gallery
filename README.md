@@ -28,19 +28,31 @@ that the link is hard to spot, see **Security model** below.
    You will *not* need the service-role key anywhere in this app (see
    **Security model**).
 
-## 2. Run the database migration
+## 2. Run the database migrations
 
 Dashboard → **SQL Editor → New query** → paste the contents of
-`supabase/migrations/0001_init.sql` → Run.
+`supabase/migrations/0001_init.sql` → Run. Then repeat for
+`supabase/migrations/0002_image_metadata.sql` (same steps, new query).
+Run them in that order, 0002 adds columns to the table 0001 creates.
 
-This creates:
+0001 creates:
 - `gallery_projects` and `messages` tables
 - Row Level Security policies for both
 - A public `gallery` Storage bucket with its own policies
 - An `updated_at` trigger
 
+0002 adds:
+- Stored width/height + a tiny blur placeholder for each photo, so the
+  public site can use next/image's real optimization (resizing,
+  AVIF/WebP, no layout shift while a photo loads) instead of serving
+  your original full-resolution files straight to visitors
+
 If you'd rather use the Supabase CLI: `supabase db push` after linking
-the project, with the migration file in place.
+the project, with both migration files in place, it applies them in
+order automatically.
+
+**Already deployed and just pulling this update?** You only need to run
+0002, your data is untouched either way.
 
 ## 3. Create your admin account
 
@@ -59,8 +71,11 @@ NEXT_PUBLIC_SUPABASE_URL=...
 NEXT_PUBLIC_SUPABASE_ANON_KEY=...
 ```
 
-The `VERCEL_TOKEN` / `VERCEL_PROJECT_ID` / `VERCEL_TEAM_ID` variables are
-optional, see **Analytics** below. Without them, the admin dashboard's
+`NEXT_PUBLIC_SITE_URL` is also optional (used for the sitemap and for
+absolute image URLs when a gallery link is shared elsewhere); without it,
+the site falls back to Vercel's own deployment URL automatically. The
+`VERCEL_TOKEN` / `VERCEL_PROJECT_ID` / `VERCEL_TEAM_ID` variables are
+optional too, see **Analytics** below. Without them, the admin dashboard's
 Analytics panel just says "not connected"; nothing else is affected.
 
 When you deploy, add the same variables in **Vercel → Project → Settings
@@ -76,10 +91,19 @@ npm run dev
 Visit `http://localhost:3000`.
 
 > I wasn't able to run `npm install` or `next build` myself while writing
-> this (this environment has no network access), so the code hasn't been
-> compiled or executed anywhere yet. I followed current Next.js 16 /
-> React 19 / Supabase patterns carefully, but if something doesn't build
-> cleanly on the first try, paste me the error and I'll fix it.
+> this (this environment has no network access, confirmed by a 403 from
+> the npm registry when I tried), so the code hasn't gone through an
+> actual Next.js build anywhere. I leaned harder on other checks to make
+> up for that: every file is run through a real JS/JSX parser after each
+> edit, the trickiest new logic (the image-metadata capture in
+> `AdminPostForm.js`) is exercised against a real generated JPEG in a
+> real headless Chromium instance rather than just reasoned about, and
+> layout changes (the mobile header, the compare-slider scroll hint) are
+> rendered and measured in that same browser rather than eyeballed. That
+> catches most of what a build would catch, but not everything a full
+> `next build` verifies, e.g. Next's own type-checking of route exports.
+> If something doesn't build cleanly on the first try, paste me the
+> error and I'll fix it.
 
 ## 6. Deploy to Vercel
 
@@ -178,6 +202,7 @@ src/
       (protected)/       dashboard, guarded layout + page
       actions.js         create/update/delete post, delete message
     layout.js, globals.css, page.js (welcome screen)
+    sitemap.js, robots.js   auto-generated sitemap.xml / robots.txt
   components/           all UI pieces, public and admin
   lib/
     supabase/            browser + server Supabase clients
@@ -185,7 +210,9 @@ src/
     actions/message.js    contact form server action
     utils.js
   content/about.js        code-editable About content
-supabase/migrations/0001_init.sql
+supabase/migrations/
+  0001_init.sql            tables, RLS policies, storage bucket
+  0002_image_metadata.sql  width/height + blur placeholder columns
 ```
 
 ## What to sanity-check after your first deploy
@@ -195,3 +222,7 @@ supabase/migrations/0001_init.sql
 - Try `/admin` while signed out, should redirect to `/admin/login`.
 - Submit the Message form and confirm it shows up under **Messages** in
   `/admin`.
+- Open a project's detail page on an actual phone: the before/after photo
+  should have a soft blurred preview while it loads rather than a blank
+  box, and dragging the slider shouldn't stop you from scrolling down for
+  the caption/tags below it.
