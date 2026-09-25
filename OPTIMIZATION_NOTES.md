@@ -118,19 +118,36 @@ Two things were going on here, one real bug and one polish/discoverability gap:
   Gallery"` generated centrally from the root layout) instead of every
   page spelling out the suffix by hand. Purely a maintenance/consistency
   change, nothing visible changes.
+- **Favicon, apple-touch-icon, and a web manifest**: there wasn't a
+  `/public` directory yet, so the site had no icon at all (a blank/generic
+  icon in browser tabs). Added `src/app/icon.svg` (a small "E" monogram in
+  the site's own accent gold on its dark background, Next's file
+  convention wires it up automatically) plus a rasterized
+  `apple-icon.png` for iOS home-screen icons, and `manifest.js` for
+  "add to home screen." Checked the monogram's legibility by actually
+  rendering it at real favicon sizes (16/32/48px) in a browser rather than
+  eyeballing the source SVG, and went with a bolder weight than my first
+  pass once the 16px render showed it was a little thin.
+- **Admin area de-indexed**: added `src/app/admin/layout.js` with
+  `robots: { index: false, follow: false }`, covering both `/admin/login`
+  and everything under the protected dashboard with one file. robots.txt
+  already disallowed `/admin` for crawlers, but that only stops crawling —
+  this is the stronger page-level signal for keeping already-linked pages
+  out of search results.
+- **Tag filter buttons** on the gallery grid now expose their
+  pressed/unpressed state (`aria-pressed`) for screen readers, they're
+  toggles, not plain links, and weren't announced as such before.
 - **`theme-color`** set to match the site's background, so the browser
   chrome on mobile (Android's address bar tint, etc.) matches the page
   instead of defaulting to white.
 
 ## What I intentionally left alone
 
-- **The About page's headshot image** (`about/page.js`) still uses a
-  plain `<img>`. It's a small, fixed-size avatar, not one of the large
-  gallery photos this pass was about, and `about.photo` can be set to
-  either a local file or some other URL, moving it to `next/image` would
-  risk breaking if you ever point it at a host not covered by
-  `next.config.js`'s remote patterns. Not worth that trade for a small
-  image outside the actual complaint.
+- **The About page's headshot** now goes through `next/image` too, but
+  only when `about.photo` is a local `/public` path (what the field's own
+  comment already documents as the normal usage) — anything else falls
+  back to a plain `<img>`, so pointing it at some other host later can't
+  break the build.
 - **The welcome screen itself** (the one-time full-screen intro before
   the gallery). It only shows once per visitor and felt like a
   deliberate choice, not a bug, so I left the design as-is beyond the

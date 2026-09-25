@@ -52,6 +52,7 @@ export default function GalleryGrid({ projects }) {
           <div className="flex flex-wrap gap-2 text-xs">
             <button
               onClick={() => setActiveTag(null)}
+              aria-pressed={activeTag === null}
               className={
                 "rounded-full border px-3 py-1.5 transition-colors " +
                 (activeTag === null
@@ -65,6 +66,7 @@ export default function GalleryGrid({ projects }) {
               <button
                 key={tag}
                 onClick={() => setActiveTag(tag === activeTag ? null : tag)}
+                aria-pressed={tag === activeTag}
                 className={
                   "rounded-full border px-3 py-1.5 transition-colors " +
                   (tag === activeTag

@@ -198,11 +198,13 @@ src/
   app/
     (public)/          gallery, project detail, about, message, shared header/footer layout
     admin/
+      layout.js          keeps the whole admin area out of search results
       login/            public login page (outside the auth guard)
       (protected)/       dashboard, guarded layout + page
       actions.js         create/update/delete post, delete message
     layout.js, globals.css, page.js (welcome screen)
-    sitemap.js, robots.js   auto-generated sitemap.xml / robots.txt
+    sitemap.js, robots.js, manifest.js   auto-generated sitemap/robots/manifest
+    icon.svg, apple-icon.png             favicon + iOS home-screen icon
   components/           all UI pieces, public and admin
   lib/
     supabase/            browser + server Supabase clients
