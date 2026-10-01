@@ -5,6 +5,8 @@ import { createClient } from "@/lib/supabase/server";
 import { parseTagsInput } from "@/lib/utils";
 
 const BUCKET = "gallery";
+const AUDIO_BUCKET = "story-audio";
+const MAX_STORY_IMAGES = 20;
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -41,11 +43,11 @@ function pathFromPublicUrl(url) {
   return decodeURIComponent(url.slice(index + marker.length));
 }
 
-async function removePaths(supabase, paths) {
+async function removePaths(supabase, paths, bucket = BUCKET) {
   const list = paths.filter(Boolean);
   if (!list.length) return;
   try {
-    await supabase.storage.from(BUCKET).remove(list);
+    await supabase.storage.from(bucket).remove(list);
   } catch {
     // Best effort only. A leftover file in Storage is harmless.
   }
@@ -143,6 +145,134 @@ export async function createPost(formData) {
   return { success: true };
 }
 
+// The story's images arrive as a JSON string: [{ path, width, height }, ...]
+// in the order they should be shown. Every entry is re-validated here (the
+// browser is never trusted): the path must be one of THIS post's own
+// uploads, and the size must be a sane integer pair. Returns null if
+// anything is off, including a count outside 1..20 (the database enforces
+// the 20 limit too, see 0003_story_posts.sql).
+function readStoryImages(formData, id) {
+  let raw;
+  try {
+    raw = JSON.parse(String(formData.get("images") ?? "[]"));
+  } catch {
+    return null;
+  }
+  if (!Array.isArray(raw)) return null;
+  if (raw.length < 1 || raw.length > MAX_STORY_IMAGES) return null;
+
+  const pattern = new RegExp(`^${id}/story-\\d{2}-\\d+\\.jpg$`);
+  const images = [];
+  for (const entry of raw) {
+    const path = String(entry?.path ?? "");
+    const width = Number(entry?.width);
+    const height = Number(entry?.height);
+    if (!pattern.test(path)) return null;
+    if (!Number.isInteger(width) || width < 1 || width > 20000) return null;
+    if (!Number.isInteger(height) || height < 1 || height > 20000) return null;
+    images.push({ path, width, height });
+  }
+  return images;
+}
+
+// Optional music: undefined = a path was sent but it isn't one of ours,
+// null = no music, string = a valid path in the audio bucket.
+function readAudioPath(formData, id) {
+  const value = String(formData.get("audioPath") ?? "");
+  if (!value) return null;
+  return new RegExp(`^${id}/audio-\\d+\\.(mp3|m4a)$`).test(value)
+    ? value
+    : undefined;
+}
+
+export async function createStoryPost(formData) {
+  const supabase = await createClient();
+  const user = await requireUser(supabase);
+  if (!user) return { success: false, error: "You need to sign in again." };
+
+  const { title, caption, note, tags } = readPostFields(formData);
+  const id = String(formData.get("id") ?? "");
+
+  if (!title) return { success: false, error: "Title is required." };
+  if (!UUID_RE.test(id)) return { success: false, error: "Missing project id." };
+
+  const images = readStoryImages(formData, id);
+  if (!images) {
+    return {
+      success: false,
+      error: `A story needs between 1 and ${MAX_STORY_IMAGES} images.`,
+    };
+  }
+  const audioPath = readAudioPath(formData, id);
+  if (audioPath === undefined) {
+    return { success: false, error: "That music upload wasn't recognised." };
+  }
+
+  const volumePercent = Number(formData.get("audioVolume"));
+  const audioVolume = Number.isFinite(volumePercent)
+    ? Math.min(1, Math.max(0, Math.round(volumePercent) / 100))
+    : 0.7;
+  const audioLoop = formData.get("audioLoop") !== "0";
+  const audioAutoplay = formData.get("audioAutoplay") !== "0";
+
+  const imagePaths = images.map((image) => image.path);
+  const cover = images[0];
+  const coverBlur = readImageMetaFields(formData, "after").blur ?? null;
+
+  try {
+    // 1) The post row. Its after_* columns hold the cover (the first image),
+    //    which is what the gallery grid and admin list already display.
+    const { error: postError } = await supabase.from("gallery_projects").insert({
+      id,
+      post_type: "story",
+      title,
+      caption: caption || null,
+      note: note || null,
+      tags,
+      before_image_url: null,
+      after_image_url: publicUrlFor(supabase, cover.path),
+      after_width: cover.width,
+      after_height: cover.height,
+      after_blur_data_url: coverBlur,
+      audio_path: audioPath,
+      audio_volume: audioVolume,
+      audio_loop: audioLoop,
+      audio_autoplay: audioAutoplay,
+    });
+    if (postError) throw postError;
+
+    // 2) The ordered images. If this fails, the post row above is deleted
+    //    again so a half-made story never shows up in the gallery.
+    const { error: imagesError } = await supabase
+      .from("gallery_story_images")
+      .insert(
+        images.map((image, index) => ({
+          project_id: id,
+          sort_order: index,
+          storage_path: image.path,
+          width: image.width,
+          height: image.height,
+        }))
+      );
+    if (imagesError) {
+      await supabase.from("gallery_projects").delete().eq("id", id);
+      throw imagesError;
+    }
+  } catch (err) {
+    await removePaths(supabase, imagePaths);
+    await removePaths(supabase, [audioPath], AUDIO_BUCKET);
+    return {
+      success: false,
+      error: err.message || "Could not publish. Please try again.",
+    };
+  }
+
+  revalidatePath("/gallery");
+  revalidatePath("/admin");
+
+  return { success: true };
+}
+
 export async function updatePost(formData) {
   const supabase = await createClient();
   const user = await requireUser(supabase);
@@ -225,6 +355,14 @@ export async function deletePost(id) {
   const user = await requireUser(supabase);
   if (!user) return { success: false, error: "You need to sign in again." };
 
+  // Story posts may own a music file in the audio bucket; remember where it
+  // is before the row (and with it the path) disappears.
+  const { data: existing } = await supabase
+    .from("gallery_projects")
+    .select("audio_path")
+    .eq("id", id)
+    .maybeSingle();
+
   const { error } = await supabase
     .from("gallery_projects")
     .delete()
@@ -232,6 +370,8 @@ export async function deletePost(id) {
   if (error) {
     return { success: false, error: "Could not delete. Please try again." };
   }
+
+  await removePaths(supabase, [existing?.audio_path], AUDIO_BUCKET);
 
   // Best-effort storage cleanup, a leftover file in Storage is harmless,
   // but we don't want a failed cleanup to make deletion itself fail.

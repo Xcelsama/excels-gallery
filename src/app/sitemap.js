@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getSiteUrl } from "@/lib/site";
 
 // Next.js App Router convention: this file becomes /sitemap.xml
 // automatically, no route handler needed.
@@ -8,11 +9,7 @@ import { createClient } from "@/lib/supabase/server";
 // this schema), so no extra filtering is needed here beyond what the
 // public site already shows.
 export default async function sitemap() {
-  const siteUrl =
-    process.env.NEXT_PUBLIC_SITE_URL ??
-    (process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : "http://localhost:3000");
+  const siteUrl = getSiteUrl();
 
   const staticRoutes = ["", "/gallery", "/about", "/message"].map((path) => ({
     url: `${siteUrl}${path}`,

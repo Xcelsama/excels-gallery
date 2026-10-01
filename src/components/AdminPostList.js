@@ -48,6 +48,7 @@ export default function AdminPostList({ projects }) {
                 <p className="truncate text-ink">{project.title}</p>
                 <p className="text-xs text-ink-faint">
                   {formatPublished(project.published_at)}
+                  {project.post_type === "story" ? " · Story" : ""}
                 </p>
               </div>
               <div className="flex shrink-0 items-center gap-4 text-sm">

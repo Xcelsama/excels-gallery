@@ -1,5 +1,6 @@
 import { Fraunces, Work_Sans } from "next/font/google";
 import { Analytics } from "@vercel/analytics/react";
+import { getSiteUrl } from "@/lib/site";
 import "./globals.css";
 
 const display = Fraunces({
@@ -22,9 +23,7 @@ const sans = Work_Sans({
 // require. Set NEXT_PUBLIC_SITE_URL in your env once the site has a real
 // domain; Vercel deployments get a working fallback automatically via
 // VERCEL_URL even before that's set.
-const siteUrl =
-  process.env.NEXT_PUBLIC_SITE_URL ??
-  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
+const siteUrl = getSiteUrl();
 
 export const metadata = {
   metadataBase: new URL(siteUrl),

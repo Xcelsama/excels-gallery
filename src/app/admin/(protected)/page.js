@@ -28,7 +28,8 @@ export default async function AdminDashboardPage() {
       <section>
         <h1 className="font-display text-2xl text-ink">Create new post</h1>
         <p className="mt-1 text-sm text-ink-muted">
-          A before and an after image are both required to publish.
+          Choose Before / After (one before and one after image, both
+          required) or Story (1 to 20 images, with optional music).
         </p>
         <div className="mt-6">
           <AdminPostForm mode="create" />

@@ -47,6 +47,11 @@ Run them in that order, 0002 adds columns to the table 0001 creates.
   AVIF/WebP, no layout shift while a photo loads) instead of serving
   your original full-resolution files straight to visitors
 
+Then run `supabase/migrations/0003_story_posts.sql` the same way. It adds
+Story posts (up to 20 images), optional background music, and the
+`story-audio` bucket. It is safe to run twice and doesn't touch existing
+posts; a rollback note is at the bottom of the file.
+
 If you'd rather use the Supabase CLI: `supabase db push` after linking
 the project, with both migration files in place, it applies them in
 order automatically.
@@ -228,3 +233,23 @@ supabase/migrations/
   should have a soft blurred preview while it loads rather than a blank
   box, and dragging the slider shouldn't stop you from scrolling down for
   the caption/tags below it.
+
+
+## Story posts, link previews and music (0003)
+
+- **Link previews**: every post page serves Open Graph + Twitter tags. The
+  image is `/gallery/<id>/og.jpg`, a ~1200 px, under-300 KB copy of the
+  "after" image (a story's first image), made by
+  `src/app/(public)/gallery/[id]/og.jpg/route.js` with `sharp`.
+  Set `NEXT_PUBLIC_SITE_URL` once you have a real domain. On Vercel, keep
+  the production domain publicly reachable: if deployment protection blocks
+  it, WhatsApp can't fetch the preview.
+- **Story posts**: admin form -> Post type -> Story. Images are compressed in
+  the browser (long side 2048 px, JPEG), reordered with the arrow buttons, and
+  uploaded straight to the `gallery` bucket. Viewer: `src/components/StoryViewer.js`.
+- **Music**: optional .mp3/.m4a (15 MB max) in the `story-audio` bucket.
+  On iPhones the browser ignores the volume setting (the phone's volume
+  buttons control it); everything else works.
+- **Security reminder**: the admin policies allow any *signed-in* user. Since
+  the anon key is public, turn off **Allow new users to sign up** in Supabase
+  (Authentication -> Sign In / Providers) so yours is the only account.

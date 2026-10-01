@@ -1,56 +1,91 @@
+import { cache } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import CompareSlider from "@/components/CompareSlider";
+import ShareButton from "@/components/ShareButton";
+import StoryViewer from "@/components/StoryViewer";
 import { createClient } from "@/lib/supabase/server";
+import { ogImageSize, OG_WIDTH } from "@/lib/og";
+import { getSiteUrl } from "@/lib/site";
 import { formatPublished } from "@/lib/utils";
+
+// generateMetadata and the page both need the post. cache() makes them share
+// ONE database query per request instead of running it twice.
+const getProject = cache(async (id) => {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("gallery_projects")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  return data ?? null;
+});
 
 export async function generateMetadata({ params }) {
   const { id } = await params;
-  const supabase = await createClient();
-  const { data: project } = await supabase
-    .from("gallery_projects")
-    .select("title, caption, after_image_url")
-    .eq("id", id)
-    .single();
-
+  const project = await getProject(id);
   if (!project) return {};
 
-  // The root layout's title template appends " | Excel's Gallery"
-  // automatically, so `title` below stays just the project name. OG/Twitter
-  // tags aren't templated the same way, so they spell out the full string.
+  const isStory = project.post_type === "story";
+  const siteUrl = getSiteUrl();
+  const pageUrl = `${siteUrl}/gallery/${id}`;
+
+  // The title template in the root layout appends " | Excel's Gallery" to
+  // `title` below, but og:/twitter: tags aren't templated, so they spell out
+  // the full string.
   const fullTitle = `${project.title} | Excel's Gallery`;
-  const description = project.caption ?? undefined;
+  const description =
+    project.caption ||
+    (isStory
+      ? "A photo story by Excel Amadi."
+      : "A before-and-after Lightroom edit by Excel Amadi.");
+
+  // The preview image is served by ./og.jpg/route.js: a ~1200px, under-300KB
+  // copy of the "after" image (a story's first image). The ?v= part changes
+  // whenever the post is edited, so chats re-fetch instead of showing a
+  // stale picture. It must be an absolute URL.
+  const version = Date.parse(project.updated_at ?? project.published_at) || 0;
+  const imageUrl = `${siteUrl}/gallery/${id}/og.jpg?v=${version}`;
+  const size = ogImageSize(project.after_width, project.after_height);
+  const image = {
+    url: imageUrl,
+    width: size?.width ?? OG_WIDTH,
+    ...(size ? { height: size.height } : {}),
+    type: "image/jpeg",
+    alt: project.title,
+  };
 
   return {
     title: project.title,
     description,
-    // The "after" shot is the finished result, so it's the one worth
-    // showing when this link is shared or unfurled elsewhere.
+    alternates: { canonical: pageUrl },
     openGraph: {
+      type: "article",
+      url: pageUrl,
+      siteName: "Excel's Gallery",
       title: fullTitle,
       description,
-      images: project.after_image_url ? [{ url: project.after_image_url }] : [],
+      images: [image],
     },
     twitter: {
       card: "summary_large_image",
       title: fullTitle,
       description,
-      images: project.after_image_url ? [project.after_image_url] : [],
+      images: [imageUrl],
     },
   };
 }
 
 export default async function ProjectPage({ params }) {
   const { id } = await params;
-  const supabase = await createClient();
-  const { data: project, error } = await supabase
-    .from("gallery_projects")
-    .select("*")
-    .eq("id", id)
-    .single();
+  const project = await getProject(id);
 
-  if (error || !project) {
+  if (!project) {
     notFound();
+  }
+
+  if (project.post_type === "story") {
+    return <StoryPost project={project} />;
   }
 
   return (
@@ -76,12 +111,19 @@ export default async function ProjectPage({ params }) {
         Gallery
       </Link>
 
-      <h1 className="mt-4 font-display text-3xl text-ink sm:text-4xl">
-        {project.title}
-      </h1>
-      <p className="mt-2 text-sm text-ink-faint">
-        {formatPublished(project.published_at)}
-      </p>
+      <div className="mt-4 flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="font-display text-3xl text-ink sm:text-4xl">
+            {project.title}
+          </h1>
+          <p className="mt-2 text-sm text-ink-faint">
+            {formatPublished(project.published_at)}
+          </p>
+        </div>
+        <div className="pt-1.5">
+          <ShareButton title={project.title} path={`/gallery/${project.id}`} />
+        </div>
+      </div>
 
       <div className="mt-8">
         <CompareSlider
@@ -122,5 +164,47 @@ export default async function ProjectPage({ params }) {
         </div>
       )}
     </main>
+  );
+}
+
+// A story post: loads its ordered images (and optional music) and hands them
+// to the full-page viewer. Image files live in the public "gallery" bucket
+// and the music in "story-audio"; getPublicUrl just builds the address, it
+// makes no network call.
+async function StoryPost({ project }) {
+  const supabase = await createClient();
+  const { data: rows } = await supabase
+    .from("gallery_story_images")
+    .select("storage_path, width, height")
+    .eq("project_id", project.id)
+    .order("sort_order", { ascending: true });
+
+  if (!rows?.length) notFound();
+
+  const images = rows.map((row) => ({
+    url: supabase.storage.from("gallery").getPublicUrl(row.storage_path).data
+      .publicUrl,
+    width: row.width,
+    height: row.height,
+  }));
+
+  const music = project.audio_path
+    ? {
+        url: supabase.storage
+          .from("story-audio")
+          .getPublicUrl(project.audio_path).data.publicUrl,
+        volume: Number(project.audio_volume),
+        loop: project.audio_loop,
+        autoplay: project.audio_autoplay,
+      }
+    : null;
+
+  return (
+    <StoryViewer
+      id={project.id}
+      title={project.title}
+      images={images}
+      music={music}
+    />
   );
 }

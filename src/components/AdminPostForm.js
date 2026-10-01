@@ -1,8 +1,17 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { createPost, updatePost } from "@/app/admin/actions";
+import { createPost, createStoryPost, updatePost } from "@/app/admin/actions";
+import StoryBuilder from "@/components/StoryBuilder";
 import { createClient } from "@/lib/supabase/client";
+import {
+  AUDIO_BUCKET,
+  IMAGE_BUCKET,
+  MAX_AUDIO_MB,
+  MAX_STORY_IMAGES,
+  checkAudio,
+  uploadStoryAssets,
+} from "@/lib/storyUpload";
 
 const BUCKET = "gallery";
 
@@ -160,10 +169,10 @@ async function uploadToStorage(supabase, projectId, slot, file) {
   return path;
 }
 
-async function removeFromStorage(supabase, paths) {
+async function removeFromStorage(supabase, paths, bucket = BUCKET) {
   if (!paths.length) return;
   try {
-    await supabase.storage.from(BUCKET).remove(paths);
+    await supabase.storage.from(bucket).remove(paths);
   } catch {
     // Best effort only. A leftover file is harmless.
   }
@@ -178,8 +187,84 @@ export default function AdminPostForm({ mode = "create", project = null, onDone 
   const [tags, setTags] = useState(project?.tags?.join(", ") ?? "");
   const [title, setTitle] = useState(project?.title ?? "");
   const [pickerKey, setPickerKey] = useState(0);
+  // "before_after" (the original post type) or "story". Only choosable when
+  // creating; an existing post keeps the type it was published with.
+  const [postType, setPostType] = useState(project?.post_type ?? "before_after");
+  const [storyItems, setStoryItems] = useState([]);
+  const [progress, setProgress] = useState(null); // { done, total } | null
   const formRef = useRef(null);
   const pending = stage !== null;
+  const isStory = postType === "story";
+
+  // Story publishing: images were already compressed when they were picked
+  // (see StoryBuilder). Here they go straight to Storage, then the server
+  // action receives only their paths, the same shape as before/after posts.
+  async function submitStory(formData) {
+    const cleanTitle = String(formData.get("title") ?? "").trim();
+    const audioFile = formData.get("audioFile");
+    const hasAudio = isRealFile(audioFile);
+
+    setError(null);
+    setNotice(null);
+
+    if (!cleanTitle) return setError("Title is required.");
+    if (storyItems.length < 1) return setError("Add at least one image to the story.");
+    if (storyItems.length > MAX_STORY_IMAGES) {
+      return setError(`A story holds up to ${MAX_STORY_IMAGES} images.`);
+    }
+    if (hasAudio) {
+      const problem = checkAudio(audioFile);
+      if (problem) return setError(problem);
+    }
+
+    const id = crypto.randomUUID();
+    const payload = new FormData();
+    for (const [key, value] of formData.entries()) {
+      if (!(value instanceof File)) payload.append(key, value);
+    }
+    payload.set("id", id);
+    payload.set("audioLoop", formData.has("audioLoop") ? "1" : "0");
+    payload.set("audioAutoplay", formData.has("audioAutoplay") ? "1" : "0");
+    // The cover is the first slide; its blur placeholder rides along.
+    payload.set("afterBlur", storyItems[0].blurDataUrl);
+
+    const supabase = createClient();
+    const uploaded = { gallery: [], audio: [] };
+
+    try {
+      setStage("uploading");
+      setProgress({ done: 0, total: storyItems.length + (hasAudio ? 1 : 0) });
+      const { images, audioPath } = await uploadStoryAssets({
+        supabase,
+        id,
+        items: storyItems,
+        audioFile: hasAudio ? audioFile : null,
+        uploaded,
+        onProgress: (done, total) => setProgress({ done, total }),
+      });
+      payload.set("images", JSON.stringify(images));
+      if (audioPath) payload.set("audioPath", audioPath);
+
+      setStage("saving");
+      const result = await createStoryPost(payload);
+      if (!result.success) throw new Error(result.error);
+
+      formRef.current?.reset();
+      setTitle("");
+      setTags("");
+      setShowPreview(false);
+      setStoryItems([]);
+      setNotice("Published. The story is live in the gallery now.");
+    } catch (err) {
+      // Don't leave orphaned uploads behind when the post didn't save.
+      await removeFromStorage(supabase, uploaded.gallery, IMAGE_BUCKET);
+      await removeFromStorage(supabase, uploaded.audio, AUDIO_BUCKET);
+      setError(err.message || "Something went wrong. Please try again.");
+    } finally {
+      setStage(null);
+      setProgress(null);
+    }
+  }
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -187,6 +272,10 @@ export default function AdminPostForm({ mode = "create", project = null, onDone 
 
     // Read everything from the form before the first await.
     const formData = new FormData(e.currentTarget);
+
+    // New story posts take their own path; before/after posts (and editing
+    // any post's text) continue below, exactly as before.
+    if (!isEdit && isStory) return submitStory(formData);
     const cleanTitle = String(formData.get("title") ?? "").trim();
     const beforeFile = formData.get("beforeImage");
     const afterFile = formData.get("afterImage");
@@ -287,6 +376,39 @@ export default function AdminPostForm({ mode = "create", project = null, onDone 
     <form ref={formRef} onSubmit={handleSubmit} className="space-y-6">
       {isEdit && <input type="hidden" name="id" value={project.id} />}
 
+      {!isEdit && (
+        <div>
+          <span className="block text-sm text-ink-muted">Post type</span>
+          <div
+            role="radiogroup"
+            aria-label="Post type"
+            className="mt-1.5 inline-flex rounded-full border border-line p-1 text-sm"
+          >
+            {[
+              ["before_after", "Before / After"],
+              ["story", "Story"],
+            ].map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                role="radio"
+                aria-checked={postType === value}
+                disabled={pending}
+                onClick={() => setPostType(value)}
+                className={
+                  "rounded-full px-5 py-1.5 transition-colors disabled:opacity-60 " +
+                  (postType === value
+                    ? "bg-accent font-medium text-bg"
+                    : "text-ink-muted hover:text-ink")
+                }
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div>
         <label htmlFor="title" className="block text-sm text-ink-muted">
           Title
@@ -341,26 +463,105 @@ export default function AdminPostForm({ mode = "create", project = null, onDone 
         <p className="mt-1 text-xs text-ink-faint">Comma-separated.</p>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <ImagePicker
-          key={`before-${pickerKey}`}
-          name="beforeImage"
-          label="Before image"
-          initialUrl={project?.before_image_url}
-          required={!isEdit}
-        />
-        <ImagePicker
-          key={`after-${pickerKey}`}
-          name="afterImage"
-          label="After image"
-          initialUrl={project?.after_image_url}
-          required={!isEdit}
-        />
-      </div>
-      <p className="-mt-3 text-xs text-ink-faint">
-        Up to {MAX_FILE_MB} MB per image.
-        {isEdit && " Leave an image untouched to keep the current file."}
-      </p>
+      {isStory ? (
+        isEdit ? (
+          <p className="text-xs text-ink-faint">
+            A story&rsquo;s images and music can&rsquo;t be changed here. To
+            change them, delete the story and publish it again.
+          </p>
+        ) : (
+          <>
+            <StoryBuilder
+              items={storyItems}
+              setItems={setStoryItems}
+              disabled={pending}
+            />
+
+            <fieldset className="space-y-4 rounded-lg border border-line p-4">
+              <legend className="px-1 text-sm text-ink-muted">
+                Background music (optional)
+              </legend>
+              <div>
+                <label htmlFor="audioFile" className="block text-sm text-ink-muted">
+                  Audio file
+                </label>
+                <input
+                  id="audioFile"
+                  type="file"
+                  name="audioFile"
+                  accept=".mp3,.m4a,audio/mpeg,audio/mp4,audio/x-m4a"
+                  className="mt-1.5 block w-full text-sm text-ink-muted file:mr-3 file:rounded-full file:border file:border-line file:bg-surface file:px-4 file:py-1.5 file:text-sm file:text-ink"
+                />
+                <p className="mt-1 text-xs text-ink-faint">
+                  .mp3 or .m4a, up to {MAX_AUDIO_MB} MB.
+                </p>
+              </div>
+              <div>
+                <label htmlFor="audioVolume" className="block text-sm text-ink-muted">
+                  Default volume
+                </label>
+                <input
+                  id="audioVolume"
+                  type="range"
+                  name="audioVolume"
+                  min="0"
+                  max="100"
+                  step="5"
+                  defaultValue="70"
+                  className="mt-2 w-full accent-[var(--accent)]"
+                />
+              </div>
+              <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-ink-muted">
+                <label className="inline-flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    name="audioLoop"
+                    defaultChecked
+                    className="h-4 w-4 accent-[var(--accent)]"
+                  />
+                  Loop
+                </label>
+                <label className="inline-flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    name="audioAutoplay"
+                    defaultChecked
+                    className="h-4 w-4 accent-[var(--accent)]"
+                  />
+                  Autoplay
+                </label>
+              </div>
+              <p className="text-xs text-ink-faint">
+                Browsers block sound until the visitor interacts, so with
+                autoplay on the music starts at their first tap.
+              </p>
+            </fieldset>
+          </>
+        )
+      ) : (
+        <>
+          <div className="grid grid-cols-2 gap-4">
+            <ImagePicker
+              key={`before-${pickerKey}`}
+              name="beforeImage"
+              label="Before image"
+              initialUrl={project?.before_image_url}
+              required={!isEdit}
+            />
+            <ImagePicker
+              key={`after-${pickerKey}`}
+              name="afterImage"
+              label="After image"
+              initialUrl={project?.after_image_url}
+              required={!isEdit}
+            />
+          </div>
+          <p className="-mt-3 text-xs text-ink-faint">
+            Up to {MAX_FILE_MB} MB per image.
+            {isEdit && " Leave an image untouched to keep the current file."}
+          </p>
+        </>
+      )}
 
       {error && <p className="text-sm text-danger">{error}</p>}
       {notice && <p className="text-sm text-ink-muted">{notice}</p>}
@@ -371,7 +572,9 @@ export default function AdminPostForm({ mode = "create", project = null, onDone 
           label={isEdit ? "Save changes" : "Publish"}
           pendingLabel={
             stage === "uploading"
-              ? "Uploading images…"
+              ? progress
+                ? `Uploading ${Math.min(progress.done + 1, progress.total)} of ${progress.total}…`
+                : "Uploading images…"
               : isEdit
                 ? "Saving…"
                 : "Publishing…"
@@ -417,8 +620,9 @@ export default function AdminPostForm({ mode = "create", project = null, onDone 
             </div>
           )}
           <p className="mt-3 text-xs text-ink-faint">
-            This is a rough preview from your local files. The published page
-            lays the before/after pair out full width.
+            {isStory
+              ? "This is a rough preview. The published story opens in a full-page viewer."
+              : "This is a rough preview from your local files. The published page lays the before/after pair out full width."}
           </p>
         </div>
       )}

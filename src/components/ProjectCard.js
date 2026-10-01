@@ -22,7 +22,7 @@ export default function ProjectCard({ project, priority = false }) {
             behind a generic blurred pill — reads as part of the photo. */}
         <div className="pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-black/50 to-transparent" />
         <span className="absolute left-3 top-3 text-[10px] font-medium uppercase tracking-[0.14em] text-ink/90">
-          After
+          {project.post_type === "story" ? "Story" : "After"}
         </span>
       </div>
 
