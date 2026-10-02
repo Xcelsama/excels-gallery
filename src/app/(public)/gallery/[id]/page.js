@@ -112,37 +112,31 @@ export default async function ProjectPage({ params }) {
 
   return (
     <main className="mx-auto max-w-5xl px-6 py-12 sm:px-8">
-      <Link
-        href="/gallery"
-        className="group inline-flex items-center gap-2 rounded-full border border-line py-1.5 pl-2.5 pr-4 text-sm text-ink-muted transition-colors hover:border-ink-faint hover:text-ink"
-      >
-        <svg
-          width="14"
-          height="14"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="transition-transform duration-200 group-hover:-translate-x-0.5"
+      {/* Top row: back link on the left; views, love and share on the right.
+          Keeping them up here leaves the full width below for the title, so a
+          long title no longer gets squeezed into a narrow column. */}
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-3">
+        <Link
+          href="/gallery"
+          className="group inline-flex items-center gap-2 rounded-full border border-line py-1.5 pl-2.5 pr-4 text-sm text-ink-muted transition-colors hover:border-ink-faint hover:text-ink"
         >
-          <path d="M19 12H5" />
-          <path d="M12 19l-7-7 7-7" />
-        </svg>
-        Gallery
-      </Link>
-
-      <div className="mt-4 flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <h1 className="font-display text-3xl text-ink sm:text-4xl">
-            {project.title}
-          </h1>
-          <p className="mt-2 text-sm text-ink-faint">
-            {formatPublished(project.published_at)}
-          </p>
-        </div>
-        <div className="flex items-center gap-2 pt-1.5">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="transition-transform duration-200 group-hover:-translate-x-0.5"
+          >
+            <path d="M19 12H5" />
+            <path d="M12 19l-7-7 7-7" />
+          </svg>
+          Gallery
+        </Link>
+        <div className="ml-auto flex items-center gap-2">
           <PostEngagement
             projectId={project.id}
             initialViews={stats.views}
@@ -150,6 +144,15 @@ export default async function ProjectPage({ params }) {
           />
           <ShareButton title={project.title} path={`/gallery/${project.id}`} />
         </div>
+      </div>
+
+      <div className="mt-5 min-w-0">
+        <h1 className="font-display text-3xl text-ink sm:text-4xl">
+          {project.title}
+        </h1>
+        <p className="mt-2 text-sm text-ink-faint">
+          {formatPublished(project.published_at)}
+        </p>
       </div>
 
       <div className="mt-8">
