@@ -49,7 +49,7 @@ function Icon({ children, size = 20, strokeWidth = 2 }) {
 const ICON_BUTTON =
   "flex h-10 w-10 items-center justify-center rounded-full text-ink-muted transition-colors hover:bg-surface-raised hover:text-ink";
 
-export default function StoryViewer({ id, title, images, music }) {
+export default function StoryViewer({ id, title, images, music, engagement }) {
   const last = images.length - 1;
   const [index, setIndex] = useState(0);
   const [stage, setStage] = useState(null); // measured { width, height } of the free area
@@ -250,6 +250,7 @@ export default function StoryViewer({ id, title, images, music }) {
         <h1 className="min-w-0 flex-1 truncate px-1 font-display text-base text-ink">
           {title}
         </h1>
+        {engagement}
         <ShareButton title={title} path={`/gallery/${id}`} variant="icon" />
         {hasMusic && (
           <>

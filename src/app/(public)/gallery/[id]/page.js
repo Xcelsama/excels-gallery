@@ -2,6 +2,7 @@ import { cache } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import CompareSlider from "@/components/CompareSlider";
+import PostEngagement from "@/components/PostEngagement";
 import ShareButton from "@/components/ShareButton";
 import StoryViewer from "@/components/StoryViewer";
 import { createClient } from "@/lib/supabase/server";
@@ -20,6 +21,25 @@ const getProject = cache(async (id) => {
     .maybeSingle();
   return data ?? null;
 });
+
+// Totals for the views / love counters. Quietly returns zeros if the
+// views-and-reactions migration (0004) hasn't been run yet.
+async function getStats(id) {
+  try {
+    const supabase = await createClient();
+    const { data } = await supabase.rpc("get_post_stats", {
+      p_project_id: id,
+      p_visitor_id: null,
+    });
+    const row = Array.isArray(data) ? data[0] : data;
+    return {
+      views: Number(row?.view_count ?? 0),
+      loves: Number(row?.love_count ?? 0),
+    };
+  } catch {
+    return { views: 0, loves: 0 };
+  }
+}
 
 export async function generateMetadata({ params }) {
   const { id } = await params;
@@ -84,8 +104,10 @@ export default async function ProjectPage({ params }) {
     notFound();
   }
 
+  const stats = await getStats(project.id);
+
   if (project.post_type === "story") {
-    return <StoryPost project={project} />;
+    return <StoryPost project={project} stats={stats} />;
   }
 
   return (
@@ -120,7 +142,12 @@ export default async function ProjectPage({ params }) {
             {formatPublished(project.published_at)}
           </p>
         </div>
-        <div className="pt-1.5">
+        <div className="flex items-center gap-2 pt-1.5">
+          <PostEngagement
+            projectId={project.id}
+            initialViews={stats.views}
+            initialLoves={stats.loves}
+          />
           <ShareButton title={project.title} path={`/gallery/${project.id}`} />
         </div>
       </div>
@@ -171,7 +198,7 @@ export default async function ProjectPage({ params }) {
 // to the full-page viewer. Image files live in the public "gallery" bucket
 // and the music in "story-audio"; getPublicUrl just builds the address, it
 // makes no network call.
-async function StoryPost({ project }) {
+async function StoryPost({ project, stats }) {
   const supabase = await createClient();
   const { data: rows } = await supabase
     .from("gallery_story_images")
@@ -205,6 +232,14 @@ async function StoryPost({ project }) {
       title={project.title}
       images={images}
       music={music}
+      engagement={
+        <PostEngagement
+          projectId={project.id}
+          initialViews={stats.views}
+          initialLoves={stats.loves}
+          variant="icon"
+        />
+      }
     />
   );
 }
