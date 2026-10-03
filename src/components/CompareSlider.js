@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
+import ImageZoomViewer from "./ImageZoomViewer";
 
 const IMAGE_SIZES = "(min-width: 640px) 45vw, 100vw";
 
@@ -31,31 +32,42 @@ export default function CompareSlider({
   const hasBeforeDims = Boolean(beforeWidth && beforeHeight);
   const hasAfterDims = Boolean(afterWidth && afterHeight);
 
+  // Which photo the zoom viewer is open on ("before" / "after"), or null.
+  const [viewer, setViewer] = useState(null);
+
   return (
     <div>
       {/* Desktop / tablet: side by side, each at its own natural ratio */}
       <div className="hidden gap-px overflow-hidden rounded-sm bg-line sm:grid sm:grid-cols-2">
         <figure className="bg-surface">
-          {hasBeforeDims ? (
-            <Image
-              src={before}
-              alt={`${title}, before`}
-              width={beforeWidth}
-              height={beforeHeight}
-              sizes={IMAGE_SIZES}
-              quality={90}
-              className="block h-auto w-full"
-              {...(beforeBlur
-                ? { placeholder: "blur", blurDataURL: beforeBlur }
-                : {})}
-            />
-          ) : (
-            <img
-              src={before}
-              alt={`${title}, before`}
-              className="block h-auto w-full"
-            />
-          )}
+          <button
+            type="button"
+            onClick={() => setViewer("before")}
+            aria-label="View the before photo larger and zoom in"
+            className="group relative block w-full cursor-zoom-in"
+          >
+            {hasBeforeDims ? (
+              <Image
+                src={before}
+                alt={`${title}, before`}
+                width={beforeWidth}
+                height={beforeHeight}
+                sizes={IMAGE_SIZES}
+                quality={90}
+                className="block h-auto w-full"
+                {...(beforeBlur
+                  ? { placeholder: "blur", blurDataURL: beforeBlur }
+                  : {})}
+              />
+            ) : (
+              <img
+                src={before}
+                alt={`${title}, before`}
+                className="block h-auto w-full"
+              />
+            )}
+            <ZoomBadge />
+          </button>
           <figcaption className="flex items-center gap-2 px-1 py-3">
             <span className="h-px w-4 bg-line" />
             <span className="text-[11px] uppercase tracking-[0.14em] text-ink-faint">
@@ -64,26 +76,34 @@ export default function CompareSlider({
           </figcaption>
         </figure>
         <figure className="bg-surface">
-          {hasAfterDims ? (
-            <Image
-              src={after}
-              alt={`${title}, after`}
-              width={afterWidth}
-              height={afterHeight}
-              sizes={IMAGE_SIZES}
-              quality={90}
-              className="block h-auto w-full"
-              {...(afterBlur
-                ? { placeholder: "blur", blurDataURL: afterBlur }
-                : {})}
-            />
-          ) : (
-            <img
-              src={after}
-              alt={`${title}, after`}
-              className="block h-auto w-full"
-            />
-          )}
+          <button
+            type="button"
+            onClick={() => setViewer("after")}
+            aria-label="View the after photo larger and zoom in"
+            className="group relative block w-full cursor-zoom-in"
+          >
+            {hasAfterDims ? (
+              <Image
+                src={after}
+                alt={`${title}, after`}
+                width={afterWidth}
+                height={afterHeight}
+                sizes={IMAGE_SIZES}
+                quality={90}
+                className="block h-auto w-full"
+                {...(afterBlur
+                  ? { placeholder: "blur", blurDataURL: afterBlur }
+                  : {})}
+              />
+            ) : (
+              <img
+                src={after}
+                alt={`${title}, after`}
+                className="block h-auto w-full"
+              />
+            )}
+            <ZoomBadge />
+          </button>
           <figcaption className="flex items-center gap-2 px-1 py-3">
             <span className="h-px w-4 bg-accent" />
             <span className="text-[11px] uppercase tracking-[0.14em] text-accent">
@@ -107,9 +127,51 @@ export default function CompareSlider({
           afterHeight={afterHeight}
           afterBlur={afterBlur}
           hasAfterDims={hasAfterDims}
+          onZoom={setViewer}
         />
       </div>
+
+      {viewer && (
+        <ImageZoomViewer
+          before={before}
+          after={after}
+          title={title}
+          initial={viewer}
+          onClose={() => setViewer(null)}
+        />
+      )}
     </div>
+  );
+}
+
+/** Small magnifier on the desktop photos, so it's clear they can be opened. */
+function ZoomBadge() {
+  return (
+    <span
+      aria-hidden="true"
+      className="pointer-events-none absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-bg text-ink-muted opacity-80 shadow transition-opacity group-hover:opacity-100"
+    >
+      <MagnifierIcon size={16} />
+    </span>
+  );
+}
+
+function MagnifierIcon({ size = 18 }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <circle cx="11" cy="11" r="7" />
+      <path d="M21 21l-4.3-4.3" />
+      <path d="M11 8v6M8 11h6" />
+    </svg>
   );
 }
 
@@ -125,6 +187,7 @@ function DragSlider({
   afterHeight,
   afterBlur,
   hasAfterDims,
+  onZoom,
 }) {
   const containerRef = useRef(null);
   const [percent, setPercent] = useState(50);
@@ -272,6 +335,18 @@ function DragSlider({
       </div>
 
       <ScrollHint />
+
+      {/* Opens the zoom viewer on whichever photo is showing more. Its own
+          pointerdown is stopped so tapping it doesn't move the slider. */}
+      <button
+        type="button"
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={() => onZoom(percent >= 50 ? "before" : "after")}
+        aria-label="Zoom into the photo"
+        className="absolute bottom-2.5 right-2.5 z-10 flex h-10 w-10 items-center justify-center rounded-full border border-line bg-bg text-ink shadow-lg"
+      >
+        <MagnifierIcon />
+      </button>
     </div>
   );
 }
